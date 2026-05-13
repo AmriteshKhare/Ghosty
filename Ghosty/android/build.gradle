@@ -1,0 +1,60 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = "../build"
+
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            def androidExt = project.extensions.findByName("android")
+            if (androidExt != null) {
+                if (androidExt.namespace == null) {
+                    def manifestFile = project.file("src/main/AndroidManifest.xml")
+                    if (manifestFile.exists()) {
+                        try {
+                            def parser = new XmlSlurper(false, false)
+                            parser.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false)
+                            def manifestXml = parser.parse(manifestFile)
+                            def pkg = manifestXml.@package?.toString()
+                            if (pkg != null && !pkg.isEmpty()) {
+                                androidExt.namespace = pkg
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+                androidExt.compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                try {
+                    androidExt.ndkVersion = "28.2.13676358"
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        plugins.withId("org.jetbrains.kotlin.android") {
+            tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                kotlinOptions {
+                    jvmTarget = "17"
+                }
+            }
+        }
+        tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = "17"
+            targetCompatibility = "17"
+        }
+    }
+
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
